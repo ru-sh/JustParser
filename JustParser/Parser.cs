@@ -11,9 +11,17 @@ namespace JustParser
     public class Parser : IParser
     {
         private readonly string _debugStr = nameof(Parser);
-        private readonly Func<string, object> _lexFunc;
+
+        private readonly Func<ArraySegment<char>, object> _lexFunc;
+
         private readonly OrderedDictionary<string, IParser> _subLexers = new OrderedDictionary<string, IParser>();
+
         private static bool _debug = false;
+
+        public Parser(Func<ArraySegment<char>, object> lexFunc)
+        {
+            _lexFunc = lexFunc;
+        }
 
         public Parser(string rule)
         {
@@ -35,7 +43,10 @@ namespace JustParser
             var result = new Dictionary<string, object>();
             foreach (var pair in match.Select(pair => pair.Value))
             {
-                if (!pair.Key.StartsWith("$") && !result.TryAdd(pair.Key, pair.Value))
+                var value = pair.Value;
+                if (value is ArraySegment<char>) value = ((ArraySegment<char>) value).AsString();
+
+                if (!pair.Key.StartsWith("$") && !result.TryAdd(pair.Key, value))
                 {
                     throw new Exception("Duplicated keys");
                 }
@@ -107,7 +118,7 @@ namespace JustParser
             };
         }
 
-        private static IEnumerable<KeyValuePair<string, object>?> TryMatch(string str, ICollection<KeyValuePair<string, IParser>> lexers)
+        private static IEnumerable<KeyValuePair<string, object>?> TryMatch(ArraySegment<char> str, ICollection<KeyValuePair<string, IParser>> lexers)
         {
             if (!lexers.Any())
             {
@@ -124,7 +135,7 @@ namespace JustParser
                 if (_debug)
                 {
                     var success = parsed == null ? '-' : '+';
-                    Console.WriteLine($"{success}{firstLexer} {str}");
+                    Console.WriteLine($"{success}{firstLexer} {str.AsString()}");
                 }
 
                 if (parsed == null)
@@ -136,16 +147,16 @@ namespace JustParser
             }
 
             int stop = -1;
-            while (stop < str.Length)
+            while (stop < str.Count - 1)
             {
                 stop++;
 
-                var firstStr = str.Substring(0, stop);
+                var firstStr = new ArraySegment<char>(str.Array, str.Offset, stop);
                 var parsed = firstLexer.Parse(firstStr);
                 if (_debug)
                 {
                     var success = parsed == null ? '-' : '+';
-                    Console.WriteLine($"{success}{firstLexer} {firstStr}");
+                    Console.WriteLine($"{success}{firstLexer} {firstStr.AsString()}");
                 }
 
                 if (parsed == null)
@@ -153,7 +164,7 @@ namespace JustParser
                     continue;
                 }
 
-                var rest = str.Substring(stop, str.Length - stop);
+                var rest = str.Slice(stop);
 
                 var restLexers = lexers.Skip(1).ToList();
                 var subScan = TryMatch(rest, restLexers).ToList();
@@ -173,12 +184,7 @@ namespace JustParser
 
         public object Parse(string str)
         {
-            return _lexFunc(str);
-        }
-
-        public Parser(Func<string, object> lexFunc)
-        {
-            _lexFunc = lexFunc;
+            return Parse(new ArraySegment<char>(str.ToCharArray()));
         }
 
         public Parser Where(string name, IParser parser)
@@ -187,7 +193,7 @@ namespace JustParser
             return this;
         }
 
-        public Parser Where(string name, Func<string, IEnumerable<object>> subLexers)
+        public Parser Where(string name, Func<ArraySegment<char>, IEnumerable<object>> subLexers)
         {
             var lexer = new Parser(s =>
             {
@@ -203,32 +209,37 @@ namespace JustParser
             return this.Where(name, lexer);
         }
 
-        public Parser Where(string name, Expression<Func<string, bool>> predicate)
+        public Parser Where(string name, Expression<Func<ArraySegment<char>, bool>> predicate)
         {
             var lexer = new ExpressionParser(predicate);
             return this.Where(name, lexer);
         }
 
-        public Parser Where(string name, Predicate<string> predicate, Func<string, object> extractFunc)
+        public Parser Where(string name, Predicate<ArraySegment<char>> predicate, Func<ArraySegment<char>, object> extractFunc)
         {
             var lexer = new Parser(s => predicate(s) ? extractFunc(s) : null);
             return this.Where(name, lexer);
         }
 
-        public Parser Where(string name, Regex regex)
-        {
-            this._subLexers.Add(name, new Parser(s => regex.Match(s).Success ? s : null));
-            return this;
-        }
+        //        public Parser Where(string name, Regex regex)
+        //        {
+        //            this._subLexers.Add(name, new Parser(s => regex.Match(s).Success ? s : null));
+        //            return this;
+        //        }
 
         public Parser WhereIsInt(string name)
         {
-            return Where(name, s => int.TryParse(s, out var n), s => int.Parse(s));
+            return Where(name, new IsDigitsParser());
         }
 
         public override string ToString()
         {
             return _debugStr;
+        }
+
+        public object Parse(ArraySegment<char> chars)
+        {
+            return _lexFunc(chars);
         }
     }
 }

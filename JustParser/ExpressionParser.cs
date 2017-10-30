@@ -5,16 +5,16 @@ namespace JustParser
 {
     public class ExpressionParser : IParser
     {
-        private readonly Expression<Func<string, bool>> _expr;
-        private readonly Func<string, bool> _predicate;
+        private readonly Expression<Func<ArraySegment<char>, bool>> _expr;
+        private readonly Func<ArraySegment<char>, bool> _predicate;
 
-        public ExpressionParser(Expression<Func<string, bool>> expr)
+        public ExpressionParser(Expression<Func<ArraySegment<char>, bool>> expr)
         {
             _expr = expr;
             _predicate = _expr.Compile();
         }
 
-        public object Parse(string str)
+        public object Parse(ArraySegment<char> str)
         {
             if (_predicate(str))
             {

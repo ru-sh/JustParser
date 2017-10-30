@@ -1,22 +1,33 @@
-﻿namespace JustParser
+﻿using System;
+
+namespace JustParser
 {
     public class ConstParser : IParser
     {
         private readonly string _constStr;
+        private readonly char[] _constChars;
 
         public ConstParser(string constStr)
         {
             _constStr = constStr;
+            _constChars = constStr.ToCharArray();
         }
 
-        public object Parse(string str)
+        public object Parse(ArraySegment<char> str)
         {
-            return _constStr == str ? str : null;
+            var isEqualsTo = _constChars.IsEqualsTo(str);
+            if (isEqualsTo)
+            {
+                var asString = str.AsString();
+                return asString;
+            }
+
+            return null;
         }
 
         public override string ToString()
         {
-            return _constStr;
+            return "'" + _constStr + "'";
         }
     }
 }
