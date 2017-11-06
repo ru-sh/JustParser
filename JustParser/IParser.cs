@@ -1,9 +1,15 @@
-﻿using System;
+﻿using System.Collections.Generic;
 
 namespace JustParser
 {
     public interface IParser
     {
-        object Parse(ArraySegment<char> chars);
+        IParseReader CreateParseReader();
+    }
+
+    public interface IParseReader
+    {
+        ParserStatus Read(char c);
+        IParseReader Clone();
     }
 }

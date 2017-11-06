@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CheapFlights.Importer.Lexing
+namespace JustParser
 {
     public class OrderedDictionary<TKey, TValue> : IDictionary<TKey, TValue>
         where TKey : IEquatable<TKey>
@@ -83,7 +83,7 @@ namespace CheapFlights.Importer.Lexing
         {
             get
             {
-                if (TryGetValue(key, out TValue val))
+                if (TryGetValue(key, out var val))
                 {
                     return val;
                 }

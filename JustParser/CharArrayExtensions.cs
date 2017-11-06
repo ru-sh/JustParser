@@ -30,6 +30,20 @@ namespace JustParser
             }
         }
 
+        public static int IndexOf(this ArraySegment<char> chars, char c)
+        {
+            for (int i = 0; i < chars.Count; i++)
+            {
+                var ch = chars[i];
+                if (ch == c)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
         public static IEnumerable<ArraySegment<char>> Split(this ArraySegment<char> chars, char splitChar)
         {
             if(chars.Count == 0) yield break;
@@ -70,14 +84,9 @@ namespace JustParser
             return chars.IndexesOf(ch).Any();
         }
 
-        public static bool IsOneOf(this ArraySegment<char> chars, IEnumerable<string> strings)
+        public static bool IsOneOf(this IReadOnlyCollection<char> chars, IEnumerable<string> strings)
         {
-            foreach (var s in strings)
-            {
-                if (chars.SequenceEqual(s)) return true;
-            }
-
-            return false;
+            return strings.Any(s => chars.Count == s.Length && chars.SequenceEqual(s));
         }
 
         public static bool IsEqualsTo(this IEnumerable<char> chars, IEnumerable<char> chars2)
@@ -85,22 +94,20 @@ namespace JustParser
             return chars.SequenceEqual(chars2);
         }
 
-        public static string AsString(this ArraySegment<char> chars)
+        public static bool IsEqualsTo(this ICollection<char> chars, ICollection<char> chars2)
+        {
+            return chars.Count == chars2.Count && chars.SequenceEqual(chars2);
+        }
+
+        public static bool StartsWith(this ArraySegment<char> chars, ArraySegment<char> subCollection)
+        {
+            if (subCollection.Count > chars.Count) return false;
+            return !chars.Where((t, i) => t != subCollection[i]).Any();
+        }
+
+        public static string AsString(this IEnumerable<char> chars)
         {
             return new String(chars.ToArray());
         }
-
-        //public static bool Contains(this ArraySegment<char> chars, string str)
-        //{
-        //    var ar = str.ToCharArray();
-        //    for (int i = 0; i < chars.Count - ar.Length; i++)
-        //    {
-        //        var match = true;
-        //        for (int j = 0; j < ar.Length; j++)
-        //        {
-
-        //        }
-        //    }
-        //}
     }
 }

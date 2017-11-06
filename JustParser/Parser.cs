@@ -1,245 +1,219 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Text.RegularExpressions;
-using CheapFlights.Importer.Lexing;
 
 namespace JustParser
 {
     public class Parser : IParser
     {
+        private static bool _debug = false;
         private readonly string _debugStr = nameof(Parser);
 
-        private readonly Func<ArraySegment<char>, object> _lexFunc;
+        private readonly OrderedDictionary<string, IParser> _subParsers = null;
 
-        private readonly OrderedDictionary<string, IParser> _subLexers = new OrderedDictionary<string, IParser>();
-
-        private static bool _debug = false;
-
-        public Parser(Func<ArraySegment<char>, object> lexFunc)
+        public Parser(OrderedDictionary<string, IParser> parsers, string debugStr = null)
         {
-            _lexFunc = lexFunc;
+            _debugStr = debugStr ?? "[" + string.Join(",", parsers.Select(pair => pair.Key)) + "]";
+            _subParsers = parsers;
         }
 
-        public Parser(string rule)
+        public IParseReader CreateParseReader()
         {
-            var lexerProvider = ParseRule(rule, _subLexers);
-            _debugStr = rule;
-
-            _lexFunc = str =>
-            {
-                var lexers = lexerProvider.Select(pair => new KeyValuePair<string, IParser>(pair.Key, pair.Value())).ToList();
-                var match = TryMatch(str, lexers).ToList();
-                return MatchToDict(match);
-            };
+            return new ParserReader(_subParsers);
         }
 
-        private static object MatchToDict(ICollection<KeyValuePair<string, object>?> match)
+        private class ParserReader : IParseReader
         {
-            if (match.Any(property => property == null)) return null;
+            private readonly List<List<PropParser>> _currentParsers;
+            private List<char> _debugBuf = new List<char>();
 
-            var result = new Dictionary<string, object>();
-            foreach (var pair in match.Select(pair => pair.Value))
+            public ParserReader(OrderedDictionary<string, IParser> parsers)
             {
-                var value = pair.Value;
-                if (value is ArraySegment<char>) value = ((ArraySegment<char>) value).AsString();
+                var propParsers = parsers.Select(pair => new PropParser(pair.Key, pair.Value, pair.Value.CreateParseReader())).ToList();
+                _currentParsers = new List<List<PropParser>> { propParsers };
+            }
 
-                if (!pair.Key.StartsWith("$") && !result.TryAdd(pair.Key, value))
+            private ParserReader(List<List<PropParser>> parsers)
+            {
+                _currentParsers = parsers;
+            }
+
+            public ParserStatus Read(char c)
+            {
+                _debugBuf.Add(c);
+
+                var propParsers = _currentParsers.ToArray();
+                foreach (var branch in propParsers)
                 {
-                    throw new Exception("Duplicated keys");
+                    var propParser = branch.FirstOrDefault(pair => pair.Value == null);
+                    var last = branch.Last();
+                    if (propParser == null || propParser == last)
+                    {
+                        propParser = last;
+                        var status = propParser.Reader.Read(c);
+                        propParser.SetValue(status.ExactMatch ? status.ParseredObject : null);
+                    }
+                    else
+                    {
+                        var parser = propParser.Reader;
+                        var state = parser.Read(c);
+
+                        if (!state.PartialMatch)
+                        {
+                            _currentParsers.Remove(branch);
+                            if (_debug)
+                                PrintParserState(_debugBuf.AsString() + " " + parser.ToString());
+                        }
+
+
+                        if (state.ExactMatch)
+                        {
+                            var cpp = propParser.Clone();
+                            cpp.SetValue(state.ParseredObject);
+                            var copy = branch
+                                .Select(selector: pp =>
+                                {
+                                    var clone = pp.Clone();
+                                    if (clone.Key == propParser.Key)
+                                    {
+                                        clone.SetValue(state.ParseredObject);
+                                    }
+
+                                    return clone;
+                                })
+                                .ToList();
+
+                            _currentParsers.Add(copy);
+
+                            if (_debug)
+                                PrintParserState(_debugBuf.AsString() + " " + parser.ToString());
+                        }
+                    }
                 }
-            }
 
-            return result;
-        }
-
-        private static IEnumerable<KeyValuePair<string, Func<IParser>>> ParseRule(string rule, IDictionary<string, IParser> subLexers)
-        {
-            if (rule.Length == 0)
-                yield break;
-
-            var openIdx = rule.IndexOf('{');
-            var closeIdx = rule.IndexOf('}');
-
-            if (closeIdx < openIdx)
-            {
-                throw new InvalidDataException($"Unable to find open bracket: '{rule}'");
-            }
-
-            if (openIdx < 0)
-            {
-                yield return KeyValuePair.Create<string, Func<IParser>>("$" + Guid.NewGuid(), () => new ConstParser(rule));
-            }
-            else if (openIdx > 0)
-            {
-                var word = rule.Substring(0, openIdx);
-                closeIdx = openIdx - 1;
-                yield return KeyValuePair.Create<string, Func<IParser>>("$" + Guid.NewGuid(), () => new ConstParser(word));
-            }
-            else
-            {
-                openIdx++; // skip '{'
-                if (closeIdx < 0)
-                {
-                    throw new InvalidDataException($"Unable to find close bracket: '{rule}'");
-                }
-
-                if (closeIdx < 2)
-                {
-                    throw new InvalidDataException($"Invalid parser name: '{rule}'");
-                }
-
-                var lexerDef = rule.Substring(openIdx, closeIdx - openIdx);
-                var parts = lexerDef.Split(':', 2);
-                var propName = parts[0];
-                var lexerName = parts.Length > 1 ? parts[1] : propName;
-                yield return KeyValuePair.Create<string, Func<IParser>>(propName, () => subLexers[lexerName]);
-            }
-
-            if (closeIdx < rule.Length)
-            {
-                var restRule = rule.Substring(closeIdx + 1);
-                var subScan = ParseRule(restRule, subLexers);
-                foreach (var pair in subScan)
-                {
-                    yield return pair;
-                }
-            }
-        }
-
-        public Parser(OrderedDictionary<string, IParser> lexers)
-        {
-            _lexFunc = s =>
-            {
-                var match = TryMatch(s, lexers.ToList()).ToList();
-                return MatchToDict(match);
-            };
-        }
-
-        private static IEnumerable<KeyValuePair<string, object>?> TryMatch(ArraySegment<char> str, ICollection<KeyValuePair<string, IParser>> lexers)
-        {
-            if (!lexers.Any())
-            {
-                yield break;
-            }
-
-            var first = lexers.First();
-            var firstLexer = first.Value;
-
-            if (lexers.Count == 1)
-            {
-                // last parser must match the whole substr
-                var parsed = firstLexer.Parse(str);
                 if (_debug)
+                    PrintParserState(_debugBuf.AsString());
+
+                if (!_currentParsers.Any())
                 {
-                    var success = parsed == null ? '-' : '+';
-                    Console.WriteLine($"{success}{firstLexer} {str.AsString()}");
+                    return ParserStatus.Mismatch();
                 }
 
-                if (parsed == null)
-                    yield return null;
-                else
-                    yield return new KeyValuePair<string, object>(first.Key, parsed);
+                var exactMatch = _currentParsers.FirstOrDefault(dictionary => dictionary.All(tuple => tuple.Value != null));
+                if (exactMatch != null)
+                {
+                    var dictionary = MatchToDict(exactMatch);
+                    return ParserStatus.Exact(dictionary);
+                }
 
-                yield break;
+                return ParserStatus.Partial();
             }
 
-            int stop = -1;
-            while (stop < str.Count - 1)
+
+            private static object MatchToDict(ICollection<PropParser> match)
             {
-                stop++;
+                if (match.Any(property => property.Value == null)) return null;
 
-                var firstStr = new ArraySegment<char>(str.Array, str.Offset, stop);
-                var parsed = firstLexer.Parse(firstStr);
-                if (_debug)
+                var result = new Dictionary<string, object>();
+                foreach (var pair in match.Where(parser => !parser.Key.StartsWith('$')))
                 {
-                    var success = parsed == null ? '-' : '+';
-                    Console.WriteLine($"{success}{firstLexer} {firstStr.AsString()}");
+                    var value = pair.Value;
+                    if (value is ArraySegment<char>)
+                        value = ((ArraySegment<char>)value).AsString();
+
+                    result.Add(pair.Key, value);
                 }
 
-                if (parsed == null)
+                return result;
+            }
+
+            private void PrintParserState(string str)
+            {
+                Console.WriteLine();
+                Console.WriteLine();
+                Console.WriteLine();
+                Console.WriteLine(str);
+                foreach (var dictionary in _currentParsers)
                 {
-                    continue;
+                    foreach (var kv in dictionary)
+                    {
+                        var st = kv.Value == null ? '-' : '+';
+                        Console.WriteLine($"{st}{kv.Key.PadRight(20)}: {kv.Parser} [{kv.Reader}]");
+                    }
+
+                    Console.WriteLine("-----");
                 }
 
-                var rest = str.Slice(stop);
+                //            Thread.Sleep(20);
+            }
 
-                var restLexers = lexers.Skip(1).ToList();
-                var subScan = TryMatch(rest, restLexers).ToList();
-                if (subScan.All(pair => pair != null))
+
+            public IParseReader Clone()
+            {
+                var subParser = _currentParsers.Select(list => list.Select(propParser => propParser.Clone()).ToList()).ToList();
+                var parser = new ParserReader(subParser)
                 {
-                    yield return new KeyValuePair<string, object>(first.Key, parsed);
-                    foreach (var val in subScan)
+                    _debugBuf = _debugBuf.ToList()
+                };
+                return parser;
+            }
+
+            private class PropParser
+            {
+                public PropParser(string key, IParser parser, IParseReader reader)
+                {
+                    Key = key;
+                    Parser = parser;
+                    Reader = reader;
+                }
+
+                public string Key { get; }
+                public IParser Parser { get; }
+                public IParseReader Reader { get; }
+                public object Value { get; private set; }
+
+                public PropParser SetValue(object value)
+                {
+                    Value = value;
+                    return this;
+                }
+
+                public PropParser Clone()
+                {
+                    return new PropParser(Key, Parser, Reader.Clone()) { Value = Value };
+                }
+            }
+
+        }
+
+        public IEnumerable<(string propName, IParser parser)> MakeFlat(
+            OrderedDictionary<string, (string propName, IParser parser)> parsers)
+        {
+            foreach (var p in parsers)
+            {
+                var parserName = p.Key;
+                var value = p.Value;
+                var iparser = value.parser;
+                if (iparser is Parser parser && parser._subParsers != null)
+                {
+                    var subs = parser._subParsers
+                        .Select(pair => (parserName + '.' + pair.Key, pair.Value))
+                        .ToList();
+
+                    foreach (var val in subs)
                     {
                         yield return val;
                     }
+
                     yield break;
                 }
             }
 
-            yield return null;
-        }
-
-        public object Parse(string str)
-        {
-            return Parse(new ArraySegment<char>(str.ToCharArray()));
-        }
-
-        public Parser Where(string name, IParser parser)
-        {
-            this._subLexers.Add(name, parser);
-            return this;
-        }
-
-        public Parser Where(string name, Func<ArraySegment<char>, IEnumerable<object>> subLexers)
-        {
-            var lexer = new Parser(s =>
-            {
-                var results = subLexers(s).ToArray();
-                if (results.All(r => r != null))
-                {
-                    return results;
-                }
-
-                return null;
-            });
-
-            return this.Where(name, lexer);
-        }
-
-        public Parser Where(string name, Expression<Func<ArraySegment<char>, bool>> predicate)
-        {
-            var lexer = new ExpressionParser(predicate);
-            return this.Where(name, lexer);
-        }
-
-        public Parser Where(string name, Predicate<ArraySegment<char>> predicate, Func<ArraySegment<char>, object> extractFunc)
-        {
-            var lexer = new Parser(s => predicate(s) ? extractFunc(s) : null);
-            return this.Where(name, lexer);
-        }
-
-        //        public Parser Where(string name, Regex regex)
-        //        {
-        //            this._subLexers.Add(name, new Parser(s => regex.Match(s).Success ? s : null));
-        //            return this;
-        //        }
-
-        public Parser WhereIsInt(string name)
-        {
-            return Where(name, new IsDigitsParser());
         }
 
         public override string ToString()
         {
             return _debugStr;
-        }
-
-        public object Parse(ArraySegment<char> chars)
-        {
-            return _lexFunc(chars);
         }
     }
 }
