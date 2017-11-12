@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.27004.2005
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JustParser", "JustParser\JustParser.csproj", "{A1C9E79F-F305-4938-B0AC-B81AC2F1D847}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JustParser.Tests", "JustParser.Tests\JustParser.Tests.csproj", "{2456BAA2-0712-49D5-97B1-CD5C443E7291}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JustParser.UnitTests", "JustParser.UnitTests\JustParser.UnitTests.csproj", "{64C7BB26-BB59-437D-8632-A895DB3C5DBC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,10 +17,10 @@ Global
 		{A1C9E79F-F305-4938-B0AC-B81AC2F1D847}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1C9E79F-F305-4938-B0AC-B81AC2F1D847}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1C9E79F-F305-4938-B0AC-B81AC2F1D847}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2456BAA2-0712-49D5-97B1-CD5C443E7291}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2456BAA2-0712-49D5-97B1-CD5C443E7291}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2456BAA2-0712-49D5-97B1-CD5C443E7291}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2456BAA2-0712-49D5-97B1-CD5C443E7291}.Release|Any CPU.Build.0 = Release|Any CPU
+		{64C7BB26-BB59-437D-8632-A895DB3C5DBC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{64C7BB26-BB59-437D-8632-A895DB3C5DBC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{64C7BB26-BB59-437D-8632-A895DB3C5DBC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{64C7BB26-BB59-437D-8632-A895DB3C5DBC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

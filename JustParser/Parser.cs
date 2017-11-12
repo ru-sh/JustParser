@@ -6,7 +6,6 @@ namespace JustParser
 {
     public class Parser : IParser
     {
-        private static bool _debug = false;
         private readonly string _debugStr = nameof(Parser);
 
         private readonly OrderedDictionary<string, IParser> _subParsers = null;
@@ -20,6 +19,35 @@ namespace JustParser
         public IParseReader CreateParseReader()
         {
             return new ParserReader(_subParsers);
+        }
+
+        public IEnumerable<(string propName, IParser parser)> MakeFlat(
+            OrderedDictionary<string, (string propName, IParser parser)> parsers)
+        {
+            foreach (var p in parsers)
+            {
+                var parserName = p.Key;
+                var value = p.Value;
+                var iparser = value.parser;
+                if (iparser is Parser parser && parser._subParsers != null)
+                {
+                    var subs = parser._subParsers
+                        .Select(pair => (parserName + '.' + pair.Key, pair.Value))
+                        .ToList();
+
+                    foreach (var val in subs)
+                    {
+                        yield return val;
+                    }
+
+                    yield break;
+                }
+            }
+        }
+
+        public override string ToString()
+        {
+            return _debugStr;
         }
 
         private class ParserReader : IParseReader
@@ -61,8 +89,7 @@ namespace JustParser
                         if (!state.PartialMatch)
                         {
                             _currentParsers.Remove(branch);
-                            if (_debug)
-                                PrintParserState(_debugBuf.AsString() + " " + parser.ToString());
+                            PrintParserState(_debugBuf.AsString() + " " + parser.ToString());
                         }
 
 
@@ -85,14 +112,12 @@ namespace JustParser
 
                             _currentParsers.Add(copy);
 
-                            if (_debug)
-                                PrintParserState(_debugBuf.AsString() + " " + parser.ToString());
+                            PrintParserState(_debugBuf.AsString() + " " + parser.ToString());
                         }
                     }
                 }
 
-                if (_debug)
-                    PrintParserState(_debugBuf.AsString());
+                PrintParserState(_debugBuf.AsString());
 
                 if (!_currentParsers.Any())
                 {
@@ -127,6 +152,7 @@ namespace JustParser
                 return result;
             }
 
+            [System.Diagnostics.Conditional("TRACE")]
             private void PrintParserState(string str)
             {
                 Console.WriteLine();
@@ -184,36 +210,10 @@ namespace JustParser
                 }
             }
 
-        }
-
-        public IEnumerable<(string propName, IParser parser)> MakeFlat(
-            OrderedDictionary<string, (string propName, IParser parser)> parsers)
-        {
-            foreach (var p in parsers)
+            public override string ToString()
             {
-                var parserName = p.Key;
-                var value = p.Value;
-                var iparser = value.parser;
-                if (iparser is Parser parser && parser._subParsers != null)
-                {
-                    var subs = parser._subParsers
-                        .Select(pair => (parserName + '.' + pair.Key, pair.Value))
-                        .ToList();
-
-                    foreach (var val in subs)
-                    {
-                        yield return val;
-                    }
-
-                    yield break;
-                }
+                return _debugBuf.AsString();
             }
-
-        }
-
-        public override string ToString()
-        {
-            return _debugStr;
         }
     }
 }

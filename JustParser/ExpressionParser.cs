@@ -7,12 +7,12 @@ namespace JustParser
 {
     public class ExpressionParser : IParser
     {
-        private readonly Expression<Func<IReadOnlyCollection<char>, bool>> _expr;
+        private readonly Expression<Func<IReadOnlyList<char>, bool>> _expr;
         private readonly bool _continueOnFail;
-        private readonly Func<IReadOnlyCollection<char>, object> _parseFunc;
-        private readonly Func<IReadOnlyCollection<char>, bool> _predicate;
+        private readonly Func<IReadOnlyList<char>, object> _parseFunc;
+        private readonly Func<IReadOnlyList<char>, bool> _predicate;
 
-        public ExpressionParser(Expression<Func<IReadOnlyCollection<char>, bool>> expr, Func<IReadOnlyCollection<char>, object> parseFunc = null, bool continueOnFail = true)
+        public ExpressionParser(Expression<Func<IReadOnlyList<char>, bool>> expr, Func<IReadOnlyList<char>, object> parseFunc = null, bool continueOnFail = true)
         {
             _expr = expr;
             _continueOnFail = continueOnFail;
@@ -33,11 +33,11 @@ namespace JustParser
         private class Reader : IParseReader
         {
             List<char> _buf = new List<char>();
-            private readonly Func<IReadOnlyCollection<char>, bool> _predicate;
-            private readonly Func<IReadOnlyCollection<char>, object> _parseFunc;
+            private readonly Func<IReadOnlyList<char>, bool> _predicate;
+            private readonly Func<IReadOnlyList<char>, object> _parseFunc;
             private readonly bool _continueOnFail;
 
-            public Reader(Func<IReadOnlyCollection<char>, bool> predicate, Func<IReadOnlyCollection<char>, object> parseFunc, bool continueOnFail)
+            public Reader(Func<IReadOnlyList<char>, bool> predicate, Func<IReadOnlyList<char>, object> parseFunc, bool continueOnFail)
             {
                 _predicate = predicate;
                 _parseFunc = parseFunc;

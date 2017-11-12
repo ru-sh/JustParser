@@ -18,19 +18,41 @@ namespace JustParser
             return true;
         }
 
-        public static IEnumerable<int> IndexesOf(this ArraySegment<char> chars, char splitChar)
+        public static IEnumerable<int> IndexesOf(this IReadOnlyList<char> chars, char c)
         {
             for (int i = 0; i < chars.Count; i++)
             {
                 var ch = chars[i];
-                if (ch == splitChar)
+                if (ch == c)
                 {
                     yield return i;
                 }
             }
         }
 
-        public static int IndexOf(this ArraySegment<char> chars, char c)
+        public static IEnumerable<int> IndexesOf(this IReadOnlyList<char> chars, string str)
+        {
+            if(string.IsNullOrEmpty(str)) throw new ArgumentException(nameof(str) + " is null or empty.");
+
+            var ar = str.ToCharArray();
+            var ix = chars.IndexesOf(ar.First());
+            foreach (var i in ix)
+            {
+                var subSeq = chars.Skip(i).Take(ar.Length);
+                if (ar.SequenceEqual(subSeq))
+                {
+                    yield return i;
+                }
+            }
+        }
+
+        public static bool Contains(this IReadOnlyList<char> chars, string str)
+        {
+            return IndexesOf(chars, str).Any();
+        }
+
+
+        public static int IndexOf(this IReadOnlyList<char> chars, char c)
         {
             for (int i = 0; i < chars.Count; i++)
             {
@@ -99,7 +121,7 @@ namespace JustParser
             return chars.Count == chars2.Count && chars.SequenceEqual(chars2);
         }
 
-        public static bool StartsWith(this ArraySegment<char> chars, ArraySegment<char> subCollection)
+        public static bool StartsWith(this IReadOnlyList<char> chars, IReadOnlyList<char> subCollection)
         {
             if (subCollection.Count > chars.Count) return false;
             return !chars.Where((t, i) => t != subCollection[i]).Any();

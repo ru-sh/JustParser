@@ -108,8 +108,8 @@ namespace JustParser
 
         public ParserBuilder Where(
             string name,
-            Expression<Func<IReadOnlyCollection<char>, bool>> predicate,
-            Func<IReadOnlyCollection<char>, object> parseFunc = null,
+            Expression<Func<IReadOnlyList<char>, bool>> predicate,
+            Func<IReadOnlyList<char>, object> parseFunc = null,
             bool continueOnFail = true)
         {
             parseFunc = parseFunc ?? (c => c.AsString());
